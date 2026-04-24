@@ -27,7 +27,7 @@ BTree::~BTree() {
 /*
   Main functions:
   - search(): return the rid associated with the given key, or -1 if not found.
-  - insert(): insert the key-rid pair into the B-Tree. If the key already exists, update the rid.
+  - insert(): insert the key-rid pair into the B-Tree.
   - remove(): remove the key and its associated rid from the B-Tree. If the key does not exist, do nothing.
 */
 
@@ -36,13 +36,39 @@ int BTree::search(int key) const {
 }
 
 void BTree::insert(int key, int rid) {
-    // TODO: implement insertion.
-    (void)key;
-    (void)rid;
+    // TODO
 }
 
 void BTree::remove(int key) {
-    // TODO: implement deletion.
-    (void)key;
+    // TODO
 }
 
+/*
+  Helper functions:
+  - findIndex(): return the index of the first entry whose key is equal to or greater than to the given key.
+  - search(Node*): recursive helper for search().
+*/
+
+int BTree::findIndex(const std::vector<Entry>& entries, int key) const {
+  int index = 0;
+
+  while (index < static_cast<int>(entries.size()) && entries[index].key < key) {
+    ++index;
+  }
+
+  return index;
+}
+
+int BTree::search(Node* node, int key) const {
+  if (node == nullptr) { return -1; }
+  int index = findIndex(node->entries, key);
+
+  if (index < static_cast<int>(node->entries.size()) &&
+    node->entries[index].key == key) {
+    return node->entries[index].rid;
+  }
+
+  if (node->isLeaf) { return -1; }
+
+  return search(node->children[index], key);
+}

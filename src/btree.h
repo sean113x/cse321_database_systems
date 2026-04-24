@@ -22,7 +22,7 @@ class BTree : public IndexTree {
     Node* root;
 
     // search() helper functions
-    int findIndex(const std::vector<int>& entries, int key) const;
+    int findIndex(const std::vector<Entry>& entries, int key) const;
     int search(Node* node, int key) const;
 
     // insert() helper functions
