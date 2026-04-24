@@ -2,38 +2,44 @@
 
 #include "index-tree.h"
 #include <vector>
+#include <utility>
 
 class BTree : public IndexTree {
-  private:
-    struct Entry {
-      int key;
-      int rid;
-      Entry(int key, int rid);
-    };
+private:
+  struct Entry {
+    int key;
+    int rid;
+    Entry(int key, int rid);
+  };
 
-    struct Node {
-      bool isLeaf;
-      std::vector<Entry> entries;
-      std::vector<Node*> children;
+  struct Node {
+    bool isLeaf;
+    std::vector<Entry> entries;
+    std::vector<Node*> children;
 
-      explicit Node(bool isLeaf);
-    };
+    explicit Node(bool isLeaf);
+  };
 
-    Node* root;
+  Node* root;
 
-    // search() helper functions
-    int findIndex(const std::vector<Entry>& entries, int key) const;
-    int search(Node* node, int key) const;
+  // search() helper functions
+  int findIndex(const std::vector<Entry>& entries, int key) const;
+  int search(Node* node, int key) const;
 
-    // insert() helper functions
-    void insertNonFull(Node* node, int key, int rid);
-    void splitChild(Node* parent, int childIndex);
+  // insert() helper functions
+  Entry splitNode(Node* node, Node*& rightNode);
+  void handleOverflow(Node* node, std::vector<std::pair<Node*, int>>& path);
 
-  public:
-    explicit BTree(int order);
-    ~BTree() override;
+  // remove() helper functions
+  void handleUnderflow(Node* node, std::vector<std::pair<Node*, int>>& path);
+  void concatenation(Node* parent, int leftIndex);
+  void redistribution(Node* parent, int leftIndex);
 
-    int search(int key) const override;
-    void insert(int key, int rid) override;
-    void remove(int key) override;
+public:
+  explicit BTree(int order);
+  ~BTree() override;
+
+  int search(int key) const override;
+  void insert(int key, int rid) override;
+  void remove(int key) override;
 };
