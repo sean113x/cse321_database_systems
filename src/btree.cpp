@@ -110,9 +110,9 @@ void BTree::remove(int key) {
   - search(): recursive helper for search().
   - splitNode(): split the given node and return the promoted entry.
   - handleOverflow(): check if the node has overflowed.
-  - handleUnderflow(): check if the node has underflowed.
   - concatenation(): concatenate the child at childIndex with its sibling.
   - redistribution(): redistribute entries between the child at childIndex and its sibling.
+  - handleUnderflow(): check if the node has under-flowed.
 */
 
 int BTree::findIndex(const std::vector<Entry>& entries, int key) const {

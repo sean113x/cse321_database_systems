@@ -32,15 +32,14 @@ private:
   int search(Node* node, int key) const;
 
   // insert() helper functions
-  Entry splitNode(Node* node, Node*& rightNode);
+  void splitNode(Node* parent, int leftIndex);
+  bool redistributeOverflow(Node* parent, int childIndex);
   void handleOverflow(Node* node, std::vector<std::pair<Node*, int>>& path);
-  bool redistributeForInsert(Node* parent, int childIndex);
-  void splitIntoThree(Node* parent, int leftIndex);
 
   // remove() helper functions
-  void handleUnderflow(Node* node, std::vector<std::pair<Node*, int>>& path);
   void concatenation(Node* parent, int leftIndex);
-  void redistribution(Node* parent, int leftIndex);
+  void redistributeUnderflow(Node* parent, int leftIndex);
+  void handleUnderflow(Node* node, std::vector<std::pair<Node*, int>>& path);
 
 public:
   explicit BStarTree(int order);

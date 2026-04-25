@@ -36,9 +36,9 @@ private:
   void handleOverflow(Node* node, std::vector<std::pair<Node*, int>>& path);
 
   // remove() helper functions
-  void handleUnderflow(Node* node, std::vector<std::pair<Node*, int>>& path);
   void concatenation(Node* parent, int leftIndex);
   void redistribution(Node* parent, int leftIndex);
+  void handleUnderflow(Node* node, std::vector<std::pair<Node*, int>>& path);
 
 public:
   explicit BTree(int order);
