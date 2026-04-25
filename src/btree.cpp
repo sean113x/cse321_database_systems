@@ -166,9 +166,7 @@ BTree::Entry BTree::splitNode(Node* node, Node*& rightNode) {
 }
 
 void BTree::handleOverflow(Node* node, std::vector<std::pair<Node*, int>>& path) {
-  int maxEntries = order - 1;
-
-  while (static_cast<int>(node->entries.size()) > maxEntries) {
+  while (static_cast<int>(node->entries.size()) > maxEntries()) {
     Node* rightNode = nullptr;
     Entry upEntry = splitNode(node, rightNode);
     
@@ -243,11 +241,8 @@ void BTree::redistribution(Node* parent, int leftIndex) {
 }
 
 void BTree::handleUnderflow(Node* node, std::vector<std::pair<Node*, int>>& path) {
-  int minEntries = (order + 1) / 2 - 1;
-  int maxEntries = order - 1;
-
   while (node != root &&
-         static_cast<int>(node->entries.size()) < minEntries) {
+         static_cast<int>(node->entries.size()) < minEntries()) {
     auto [parent, childIndex] = path.back();
     path.pop_back();
 
@@ -265,12 +260,12 @@ void BTree::handleUnderflow(Node* node, std::vector<std::pair<Node*, int>>& path
         1 +
         static_cast<int>(right->entries.size());
 
-    if (total <= maxEntries) {
+    if (total <= maxEntries()) { // Underflow by parent node or not.
       concatenation(parent, leftIndex);
-      node = parent;  // parent may now underflow
+      node = parent;
     } else {
       redistribution(parent, leftIndex);
-      return;         // redistribution does not reduce parent size
+      return;
     }
   }
 

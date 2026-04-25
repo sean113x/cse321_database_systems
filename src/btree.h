@@ -22,6 +22,11 @@ private:
 
   Node* root;
 
+  // capacity helper functions
+  int minEntries() const override {
+    return (order + 1) / 2 - 1;
+  }
+
   // search() helper functions
   int findIndex(const std::vector<Entry>& entries, int key) const;
   int search(Node* node, int key) const;
