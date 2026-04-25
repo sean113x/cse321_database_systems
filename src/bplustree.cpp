@@ -6,7 +6,13 @@ BPlusTree::Entry::Entry(int key, int rid)
     : key(key), rid(rid) {}
 
 BPlusTree::Node::Node(bool isLeaf)
-    : isLeaf(isLeaf), next(nullptr) {}
+    : isLeaf(isLeaf) {}
+
+BPlusTree::InternalNode::InternalNode()
+    : Node(false) {}
+
+BPlusTree::LeafNode::LeafNode()
+    : Node(true), next(nullptr) {}
 
 BPlusTree::BPlusTree(int order)
     : IndexTree(order), root(nullptr) {
@@ -18,7 +24,10 @@ BPlusTree::BPlusTree(int order)
 BPlusTree::~BPlusTree() {
   auto clear = [](auto&& self, Node* node) -> void {
     if (node == nullptr) { return; }
-    for (Node* child : node->children) { self(self, child); }
+    if (!node->isLeaf) {
+      auto* internal = static_cast<InternalNode*>(node);
+      for (Node* child : internal->children) { self(self, child); }
+    }
     delete node;
   };
   clear(clear, root);
@@ -32,7 +41,7 @@ BPlusTree::~BPlusTree() {
 */
 
 int BPlusTree::search(int key) const {
-  // TODO
+  return search(root, key);
 }
 
 void BPlusTree::insert(int key, int rid) {
@@ -45,39 +54,77 @@ void BPlusTree::remove(int key) {
 
 /*
   Helper functions:
-  - findIndex(): return the index of the first entry whose key is equal to or greater than the given key.
+  - findIndex(): return the index of the first key/entry whose key is equal to or greater than the given key.
   - search(): recursive helper for search().
-  - splitNode(): split the given node and return the promoted separator entry.
+  - splitNode(): split the given node and return the promoted separator key.
   - handleOverflow(): check if the node has overflowed.
   - concatenation(): concatenate the child at childIndex with its sibling.
   - redistribution(): redistribute entries between the child at childIndex and its sibling.
   - handleUnderflow(): check if the node has underflowed.
 */
 
+int BPlusTree::findIndex(const std::vector<int>& keys, int key) const {
+  int index = 0;
+
+  while (index < static_cast<int>(keys.size()) && keys[index] < key) {
+    ++index;
+  }
+
+  return index;
+}
+
 int BPlusTree::findIndex(const std::vector<Entry>& entries, int key) const {
-  // TODO
+  int index = 0;
+
+  while (index < static_cast<int>(entries.size()) && entries[index].key < key) {
+    ++index;
+  }
+
+  return index;
 }
 
 int BPlusTree::search(Node* node, int key) const {
+  if (node == nullptr) { return -1; }
+
+  if (node->isLeaf) { // It must reach to a leaf node.
+    auto* leaf = static_cast<LeafNode*>(node);
+    int index = findIndex(leaf->entries, key);
+
+    if (index < static_cast<int>(leaf->entries.size()) &&
+        leaf->entries[index].key == key) {
+      return leaf->entries[index].rid;
+    }
+
+    return -1;
+  }
+
+  auto* internal = static_cast<InternalNode*>(node);
+  int index = findIndex(internal->keys, key);
+
+  if (index < static_cast<int>(internal->keys.size()) &&
+      internal->keys[index] == key) {
+    ++index;
+  }
+
+  return search(internal->children[index], key);
+}
+
+int BPlusTree::splitNode(Node* node, Node*& rightNode) {
   // TODO
 }
 
-BPlusTree::Entry BPlusTree::splitNode(Node* node, Node*& rightNode) {
+void BPlusTree::handleOverflow(Node* node, std::vector<std::pair<InternalNode*, int>>& path) {
   // TODO
 }
 
-void BPlusTree::handleOverflow(Node* node, std::vector<std::pair<Node*, int>>& path) {
+void BPlusTree::concatenation(InternalNode* parent, int leftIndex) {
   // TODO
 }
 
-void BPlusTree::concatenation(Node* parent, int leftIndex) {
+void BPlusTree::redistribution(InternalNode* parent, int leftIndex) {
   // TODO
 }
 
-void BPlusTree::redistribution(Node* parent, int leftIndex) {
-  // TODO
-}
-
-void BPlusTree::handleUnderflow(Node* node, std::vector<std::pair<Node*, int>>& path) {
+void BPlusTree::handleUnderflow(Node* node, std::vector<std::pair<InternalNode*, int>>& path) {
   // TODO
 }
