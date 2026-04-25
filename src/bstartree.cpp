@@ -25,7 +25,7 @@ BStarTree::~BStarTree() {
 }
 
 /*
-  Main functions: (same as BTree)
+  Main functions: (same as B-tree)
   - search(): return the rid associated with the given key, or -1 if not found.
   - insert(): insert the key-rid pair into the B*-Tree.
   - remove(): remove the key and its associated rid from the B*-Tree. If the key does not exist, do nothing.
@@ -108,11 +108,14 @@ void BStarTree::remove(int key) {
   Helper functions:
   - findIndex(): return the index of the first entry whose key is equal to or greater than to the given key.
   - search(): recursive helper for search().
+
   - splitNode(): split two full sibling nodes into three nodes.
   - redistributeOverflow(): redistribute entries with a sibling before splitting.
   - handleOverflow(): check if the node has overflowed.
-  - concatenation(): concatenate the child at childIndex with its sibling.
-  - redistributeUnderflow(): redistribute entries between the child at childIndex and its sibling.
+  
+  - concatenation(): concatenate neighboring nodes when redistribution is not possible.
+  - redistribution2(): redistribute entries between two neighboring children.
+  - redistribution3(): redistribute entries among three neighboring children.
   - handleUnderflow(): check if the node has underflowed.
 */
 
@@ -177,7 +180,8 @@ void BStarTree::splitNode(Node* parent, int leftIndex) {
 }
 
 void BStarTree::handleOverflow(Node* node, std::vector<std::pair<Node*, int>>& path) {
-  while (static_cast<int>(node->entries.size()) > maxEntries()) {
+  while (static_cast<int>(node->entries.size()) >
+         (node == root ? rootMaxEntries() : maxEntries())) {
     if (path.empty()) { // If the root node overflows, split it into two nodes.
       int mid = static_cast<int>(node->entries.size()) / 2;
       Entry upEntry = node->entries[mid];
@@ -202,6 +206,7 @@ void BStarTree::handleOverflow(Node* node, std::vector<std::pair<Node*, int>>& p
     auto [parent, childIndex] = path.back();
     path.pop_back();
 
+    // Try to redistribution first.
     if (redistributeOverflow(parent, childIndex)) {
       return;
     }
@@ -255,14 +260,224 @@ bool BStarTree::redistributeOverflow(Node* parent, int childIndex) {
   return true;
 }
 
-void BStarTree::concatenation(Node*, int) {
-  // TODO
+void BStarTree::concatenation(Node* parent, int childIndex) {
+  int startIndex = -1;
+  int childCount = static_cast<int>(parent->children.size());
+
+  for (int candidate : {childIndex - 2, childIndex - 1, childIndex}) {
+    if (candidate < 0 || candidate + 2 >= childCount) { continue; }
+
+    Node* first = parent->children[candidate];
+    Node* second = parent->children[candidate + 1];
+    Node* third = parent->children[candidate + 2];
+
+    int total =
+        static_cast<int>(first->entries.size()) +
+        static_cast<int>(second->entries.size()) +
+        static_cast<int>(third->entries.size()) +
+        2;
+
+    int childEntryCount = total - 1;
+    if (childEntryCount >= 2 * minEntries() &&
+        childEntryCount <= 2 * maxEntries()) {
+      startIndex = candidate;
+      break;
+    }
+  }
+
+  if (startIndex == -1) {
+    int leftIndex = (childIndex > 0) ? childIndex - 1 : childIndex;
+    Node* left = parent->children[leftIndex];
+    Node* right = parent->children[leftIndex + 1];
+
+    left->entries.push_back(parent->entries[leftIndex]);
+    left->entries.insert(left->entries.end(), right->entries.begin(), right->entries.end());
+
+    if (!left->isLeaf) {
+      left->children.insert(left->children.end(), right->children.begin(), right->children.end());
+    }
+
+    parent->entries.erase(parent->entries.begin() + leftIndex);
+    parent->children.erase(parent->children.begin() + leftIndex + 1);
+    delete right;
+    return;
+  }
+
+  Node* first = parent->children[startIndex];
+  Node* second = parent->children[startIndex + 1];
+  Node* third = parent->children[startIndex + 2];
+
+  std::vector<Entry> entries = first->entries;
+  entries.push_back(parent->entries[startIndex]);
+  entries.insert(entries.end(), second->entries.begin(), second->entries.end());
+  entries.push_back(parent->entries[startIndex + 1]);
+  entries.insert(entries.end(), third->entries.begin(), third->entries.end());
+
+  int childEntryCount = static_cast<int>(entries.size()) - 1;
+  int leftEntryCount = (childEntryCount + 1) / 2;
+  if (leftEntryCount > maxEntries()) { leftEntryCount = maxEntries(); }
+  if (childEntryCount - leftEntryCount < minEntries()) {
+    leftEntryCount = childEntryCount - minEntries();
+  }
+
+  first->entries.assign(entries.begin(), entries.begin() + leftEntryCount);
+  parent->entries[startIndex] = entries[leftEntryCount];
+  second->entries.assign(entries.begin() + leftEntryCount + 1, entries.end());
+
+  if (!first->isLeaf) {
+    std::vector<Node*> children = first->children;
+    children.insert(children.end(), second->children.begin(), second->children.end());
+    children.insert(children.end(), third->children.begin(), third->children.end());
+
+    int firstChildCount = static_cast<int>(first->entries.size()) + 1;
+
+    first->children.assign(children.begin(), children.begin() + firstChildCount);
+    second->children.assign(children.begin() + firstChildCount, children.end());
+  }
+
+  parent->entries.erase(parent->entries.begin() + startIndex + 1);
+  parent->children.erase(parent->children.begin() + startIndex + 2);
+  delete third;
 }
 
-void BStarTree::redistributeUnderflow(Node*, int) {
-  // TODO
+bool BStarTree::redistribution2(Node* parent, int childIndex) {
+  int leftIndex = -1;
+
+  for (int candidate : {childIndex - 1, childIndex}) {
+    if (candidate < 0 ||
+        candidate + 1 >= static_cast<int>(parent->children.size())) {
+      continue;
+    }
+
+    Node* left = parent->children[candidate];
+    Node* right = parent->children[candidate + 1];
+    int total =
+        static_cast<int>(left->entries.size()) +
+        1 +
+        static_cast<int>(right->entries.size());
+
+    if (total >= 2 * minEntries() + 1) {
+      leftIndex = candidate;
+      break;
+    }
+  }
+
+  if (leftIndex == -1) { return false; }
+
+  Node* left = parent->children[leftIndex];
+  Node* right = parent->children[leftIndex + 1];
+
+  std::vector<Entry> entries = left->entries;
+  entries.push_back(parent->entries[leftIndex]);
+  entries.insert(entries.end(), right->entries.begin(), right->entries.end());
+
+  int mid = static_cast<int>(entries.size()) / 2;
+
+  left->entries.assign(entries.begin(), entries.begin() + mid);
+  parent->entries[leftIndex] = entries[mid];
+  right->entries.assign(entries.begin() + mid + 1, entries.end());
+
+  if (!left->isLeaf) {
+    std::vector<Node*> children = left->children;
+    children.insert(children.end(), right->children.begin(), right->children.end());
+
+    int leftChildCount = static_cast<int>(left->entries.size()) + 1;
+
+    left->children.assign(children.begin(), children.begin() + leftChildCount);
+    right->children.assign(children.begin() + leftChildCount, children.end());
+  }
+
+  return true;
 }
 
-void BStarTree::handleUnderflow(Node*, std::vector<std::pair<Node*, int>>&) {
-  // TODO
+bool BStarTree::redistribution3(Node* parent, int childIndex) {
+  int startIndex = -1;
+  int childCount = static_cast<int>(parent->children.size());
+
+  for (int candidate : {childIndex - 2, childIndex - 1, childIndex}) {
+    if (candidate < 0 || candidate + 2 >= childCount) { continue; }
+
+    Node* first = parent->children[candidate];
+    Node* second = parent->children[candidate + 1];
+    Node* third = parent->children[candidate + 2];
+
+    int total =
+        static_cast<int>(first->entries.size()) +
+        static_cast<int>(second->entries.size()) +
+        static_cast<int>(third->entries.size()) +
+        2;
+
+    int childEntryCount = total - 2;
+    if (childEntryCount >= 3 * minEntries() &&
+        childEntryCount <= 3 * maxEntries()) {
+      startIndex = candidate;
+      break;
+    }
+  }
+
+  if (startIndex == -1) { return false; }
+
+  Node* first = parent->children[startIndex];
+  Node* second = parent->children[startIndex + 1];
+  Node* third = parent->children[startIndex + 2];
+
+  std::vector<Entry> entries = first->entries;
+  entries.push_back(parent->entries[startIndex]);
+  entries.insert(entries.end(), second->entries.begin(), second->entries.end());
+  entries.push_back(parent->entries[startIndex + 1]);
+  entries.insert(entries.end(), third->entries.begin(), third->entries.end());
+
+  int childEntryCount = static_cast<int>(entries.size()) - 2;
+  int firstEntryCount = (childEntryCount + 2) / 3;
+  int secondEntryCount = (childEntryCount + 1) / 3;
+  int firstUpIndex = firstEntryCount;
+  int secondUpIndex = firstUpIndex + 1 + secondEntryCount;
+
+  first->entries.assign(entries.begin(), entries.begin() + firstUpIndex);
+  parent->entries[startIndex] = entries[firstUpIndex];
+  second->entries.assign(entries.begin() + firstUpIndex + 1,
+                         entries.begin() + secondUpIndex);
+  parent->entries[startIndex + 1] = entries[secondUpIndex];
+  third->entries.assign(entries.begin() + secondUpIndex + 1, entries.end());
+
+  if (!first->isLeaf) {
+    std::vector<Node*> children = first->children;
+    children.insert(children.end(), second->children.begin(), second->children.end());
+    children.insert(children.end(), third->children.begin(), third->children.end());
+
+    int firstChildEnd = firstUpIndex + 1;
+    int secondChildEnd = secondUpIndex + 1;
+
+    first->children.assign(children.begin(), children.begin() + firstChildEnd);
+    second->children.assign(children.begin() + firstChildEnd,
+                            children.begin() + secondChildEnd);
+    third->children.assign(children.begin() + secondChildEnd, children.end());
+  }
+
+  return true;
+}
+
+void BStarTree::handleUnderflow(Node* node, std::vector<std::pair<Node*, int>>& path) {
+  while (node != root && static_cast<int>(node->entries.size()) < minEntries()) {
+    auto [parent, childIndex] = path.back();
+    path.pop_back();
+
+    if (redistribution2(parent, childIndex)) { return; }
+    if (redistribution3(parent, childIndex)) { return; }
+
+    concatenation(parent, childIndex);
+    node = parent;
+  }
+
+  if (root != nullptr && root->entries.empty()) {
+    Node* oldRoot = root;
+
+    if (root->isLeaf) {
+      root = nullptr;
+    } else {
+      root = root->children[0];
+    }
+
+    delete oldRoot;
+  }
 }

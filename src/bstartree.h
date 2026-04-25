@@ -24,7 +24,11 @@ private:
 
   // capacity helper functions
   int minEntries() const override {
-    return (2 * order + 2) / 3 - 1;
+    return (2 * maxEntries()) / 3;
+  }
+
+  int rootMaxEntries() const {
+    return 2 * minEntries();
   }
 
   // search() helper functions
@@ -37,8 +41,9 @@ private:
   void handleOverflow(Node* node, std::vector<std::pair<Node*, int>>& path);
 
   // remove() helper functions
-  void concatenation(Node* parent, int leftIndex);
-  void redistributeUnderflow(Node* parent, int leftIndex);
+  void concatenation(Node* parent, int childIndex);
+  bool redistribution2(Node* parent, int childIndex);
+  bool redistribution3(Node* parent, int childIndex);
   void handleUnderflow(Node* node, std::vector<std::pair<Node*, int>>& path);
 
 public:
