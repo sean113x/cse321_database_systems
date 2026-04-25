@@ -2,38 +2,38 @@
 
 #include <stdexcept>
 
-BStarTree::Entry::Entry(int key, int rid)
-    : key(key), rid(rid) {}
+BStarTree::Entry::Entry(int key, int rid) : key(key), rid(rid) {}
 
-BStarTree::Node::Node(bool isLeaf)
-    : isLeaf(isLeaf) {}
+BStarTree::Node::Node(bool isLeaf) : isLeaf(isLeaf) {}
 
-BStarTree::BStarTree(int order)
-    : IndexTree(order), root(nullptr) {
-    if (order < 3) {
-        throw std::invalid_argument("BStarTree order must be at least 3.");
-    }
+BStarTree::BStarTree(int order) : IndexTree(order), root(nullptr) {
+  if (order < 3) {
+    throw std::invalid_argument("BStarTree order must be at least 3.");
+  }
 }
 
 BStarTree::~BStarTree() {
-    auto clear = [](auto&& self, Node* node) -> void {
-        if (node == nullptr) { return; }
-        for (Node* child : node->children) { self(self, child); }
-        delete node;
-    };
-    clear(clear, root);
+  auto clear = [](auto &&self, Node *node) -> void {
+    if (node == nullptr) {
+      return;
+    }
+    for (Node *child : node->children) {
+      self(self, child);
+    }
+    delete node;
+  };
+  clear(clear, root);
 }
 
 /*
   Main functions: (same as B-tree)
   - search(): return the rid associated with the given key, or -1 if not found.
   - insert(): insert the key-rid pair into the B*-Tree.
-  - remove(): remove the key and its associated rid from the B*-Tree. If the key does not exist, do nothing.
+  - remove(): remove the key and its associated rid from the B*-Tree. If the key
+  does not exist, do nothing.
 */
 
-int BStarTree::search(int key) const {
-    return search(root, key);
-}
+int BStarTree::search(int key) const { return search(root, key); }
 
 void BStarTree::insert(int key, int rid) {
   Entry newEntry(key, rid);
@@ -44,15 +44,17 @@ void BStarTree::insert(int key, int rid) {
     return;
   }
 
-  std::vector<std::pair<Node*, int>> path;
-  Node* current = root;
+  std::vector<std::pair<Node *, int>> path;
+  Node *current = root;
 
   while (!current->isLeaf) {
     int index = findIndex(current->entries, key);
 
     // If the key already exists in an internal node, do not insert
     if (index < static_cast<int>(current->entries.size()) &&
-        current->entries[index].key == key) { return; }
+        current->entries[index].key == key) {
+      return;
+    }
     path.push_back({current, index});
     current = current->children[index];
   }
@@ -61,17 +63,21 @@ void BStarTree::insert(int key, int rid) {
 
   // If the key already exists in a leaf node, do not insert
   if (index < static_cast<int>(current->entries.size()) &&
-      current->entries[index].key == key) { return; }
+      current->entries[index].key == key) {
+    return;
+  }
 
   current->entries.insert(current->entries.begin() + index, newEntry);
   handleOverflow(current, path);
 }
 
 void BStarTree::remove(int key) {
-  if (root == nullptr) { return; }
+  if (root == nullptr) {
+    return;
+  }
 
-  std::vector<std::pair<Node*, int>> path;
-  Node* current = root;
+  std::vector<std::pair<Node *, int>> path;
+  Node *current = root;
 
   while (true) {
     int index = findIndex(current->entries, key);
@@ -79,7 +85,7 @@ void BStarTree::remove(int key) {
     if (index < static_cast<int>(current->entries.size()) &&
         current->entries[index].key == key) {
       if (!current->isLeaf) {
-        Node* successor = current->children[index + 1];
+        Node *successor = current->children[index + 1];
         path.push_back({current, index + 1});
 
         while (!successor->isLeaf) {
@@ -97,7 +103,9 @@ void BStarTree::remove(int key) {
       return;
     }
 
-    if (current->isLeaf) { return; }
+    if (current->isLeaf) {
+      return;
+    }
 
     path.push_back({current, index});
     current = current->children[index];
@@ -106,20 +114,24 @@ void BStarTree::remove(int key) {
 
 /*
   Helper functions:
-  - findIndex(): return the index of the first entry whose key is equal to or greater than to the given key.
+  - findIndex(): return the index of the first entry whose key is equal to or
+  greater than to the given key.
   - search(): recursive helper for search().
 
   - splitNode(): split two full sibling nodes into three nodes.
-  - redistributeOverflow(): redistribute entries with a sibling before splitting.
+  - redistributeOverflow(): redistribute entries with a sibling before
+  splitting.
   - handleOverflow(): check if the node has overflowed.
-  
-  - concatenation(): concatenate neighboring nodes when redistribution is not possible.
+
+  - concatenation(): concatenate neighboring nodes when redistribution is not
+  possible.
   - redistribution2(): redistribute entries between two neighboring children.
   - redistribution3(): redistribute entries among three neighboring children.
   - handleUnderflow(): check if the node has underflowed.
 */
 
-int BStarTree::findIndex(const std::vector<Entry>& entries, int key) const { // same as B-tree
+int BStarTree::findIndex(const std::vector<Entry> &entries,
+                         int key) const { // same as B-tree
   int index = 0;
 
   while (index < static_cast<int>(entries.size()) && entries[index].key < key) {
@@ -129,8 +141,10 @@ int BStarTree::findIndex(const std::vector<Entry>& entries, int key) const { // 
   return index;
 }
 
-int BStarTree::search(Node* node, int key) const { // same as B-tree
-  if (node == nullptr) { return -1; }
+int BStarTree::search(Node *node, int key) const { // same as B-tree
+  if (node == nullptr) {
+    return -1;
+  }
   int index = findIndex(node->entries, key);
 
   if (index < static_cast<int>(node->entries.size()) &&
@@ -138,40 +152,48 @@ int BStarTree::search(Node* node, int key) const { // same as B-tree
     return node->entries[index].rid;
   }
 
-  if (node->isLeaf) { return -1; }
+  if (node->isLeaf) {
+    return -1;
+  }
 
   return search(node->children[index], key);
 }
 
-void BStarTree::splitNode(Node* parent, int leftIndex) {
-  Node* left = parent->children[leftIndex];
-  Node* right = parent->children[leftIndex + 1];
-  Node* middle = new Node(left->isLeaf);
+void BStarTree::splitNode(Node *parent, int leftIndex) {
+  Node *left = parent->children[leftIndex];
+  Node *right = parent->children[leftIndex + 1];
+  Node *middle = new Node(left->isLeaf);
 
   std::vector<Entry> entries = left->entries;
-  entries.push_back(parent->entries[leftIndex]); // Add the separating entry from the parent.
+  entries.push_back(
+      parent->entries[leftIndex]); // Add the separating entry from the parent.
   entries.insert(entries.end(), right->entries.begin(), right->entries.end());
 
   int entryCount = static_cast<int>(entries.size()) - 2; // 2 separator.
   int firstUpIndex = (entryCount + 2) / 3;
   int secondUpIndex = firstUpIndex + 1 + (entryCount + 1) / 3;
 
-  // Distribute entries to left, middle, and right nodes. Promote two separators to the parent node.
+  // Distribute entries to left, middle, and right nodes. Promote two separators
+  // to the parent node.
   left->entries.assign(entries.begin(), entries.begin() + firstUpIndex);
   parent->entries[leftIndex] = entries[firstUpIndex];
-  middle->entries.assign(entries.begin() + firstUpIndex + 1, entries.begin() + secondUpIndex);
-  parent->entries.insert(parent->entries.begin() + leftIndex + 1, entries[secondUpIndex]);
+  middle->entries.assign(entries.begin() + firstUpIndex + 1,
+                         entries.begin() + secondUpIndex);
+  parent->entries.insert(parent->entries.begin() + leftIndex + 1,
+                         entries[secondUpIndex]);
   right->entries.assign(entries.begin() + secondUpIndex + 1, entries.end());
 
   if (!left->isLeaf) { // Internal node case: distribute child pointers as well.
-    std::vector<Node*> children = left->children;
-    children.insert(children.end(), right->children.begin(), right->children.end());
+    std::vector<Node *> children = left->children;
+    children.insert(children.end(), right->children.begin(),
+                    right->children.end());
 
     int firstChildEnd = firstUpIndex + 1;
     int secondChildEnd = secondUpIndex + 1;
 
     left->children.assign(children.begin(), children.begin() + firstChildEnd);
-    middle->children.assign(children.begin() + firstChildEnd, children.begin() + secondChildEnd);
+    middle->children.assign(children.begin() + firstChildEnd,
+                            children.begin() + secondChildEnd);
     right->children.assign(children.begin() + secondChildEnd, children.end());
   }
 
@@ -179,19 +201,22 @@ void BStarTree::splitNode(Node* parent, int leftIndex) {
   splitCount++;
 }
 
-void BStarTree::handleOverflow(Node* node, std::vector<std::pair<Node*, int>>& path) {
+void BStarTree::handleOverflow(Node *node,
+                               std::vector<std::pair<Node *, int>> &path) {
   while (static_cast<int>(node->entries.size()) >
          (node == root ? rootMaxEntries() : maxEntries())) {
     if (path.empty()) { // If the root node overflows, split it into two nodes.
       int mid = static_cast<int>(node->entries.size()) / 2;
       Entry upEntry = node->entries[mid];
-      Node* rightNode = new Node(node->isLeaf);
+      Node *rightNode = new Node(node->isLeaf);
 
-      rightNode->entries.assign(node->entries.begin() + mid + 1, node->entries.end());
+      rightNode->entries.assign(node->entries.begin() + mid + 1,
+                                node->entries.end());
       node->entries.erase(node->entries.begin() + mid, node->entries.end());
 
       if (!node->isLeaf) {
-        rightNode->children.assign(node->children.begin() + mid + 1, node->children.end());
+        rightNode->children.assign(node->children.begin() + mid + 1,
+                                   node->children.end());
         node->children.resize(mid + 1);
       }
 
@@ -211,31 +236,33 @@ void BStarTree::handleOverflow(Node* node, std::vector<std::pair<Node*, int>>& p
       return;
     }
 
-    int leftIndex =
-        (childIndex < static_cast<int>(parent->children.size()) - 1)
-            ? childIndex
-            : childIndex - 1;
+    int leftIndex = (childIndex < static_cast<int>(parent->children.size()) - 1)
+                        ? childIndex
+                        : childIndex - 1;
 
     splitNode(parent, leftIndex);
     node = parent;
   }
 }
 
-bool BStarTree::redistributeOverflow(Node* parent, int childIndex) {
+bool BStarTree::redistributeOverflow(Node *parent, int childIndex) {
   int leftIndex = -1;
 
   if (childIndex < static_cast<int>(parent->children.size()) - 1 &&
-      static_cast<int>(parent->children[childIndex + 1]->entries.size()) < maxEntries()) {
+      static_cast<int>(parent->children[childIndex + 1]->entries.size()) <
+          maxEntries()) {
     leftIndex = childIndex;
   } else if (childIndex > 0 &&
-             static_cast<int>(parent->children[childIndex - 1]->entries.size()) < maxEntries()) {
+             static_cast<int>(
+                 parent->children[childIndex - 1]->entries.size()) <
+                 maxEntries()) {
     leftIndex = childIndex - 1;
   } else {
     return false;
   }
 
-  Node* left = parent->children[leftIndex];
-  Node* right = parent->children[leftIndex + 1];
+  Node *left = parent->children[leftIndex];
+  Node *right = parent->children[leftIndex + 1];
 
   std::vector<Entry> entries = left->entries;
   entries.push_back(parent->entries[leftIndex]);
@@ -248,8 +275,9 @@ bool BStarTree::redistributeOverflow(Node* parent, int childIndex) {
   right->entries.assign(entries.begin() + mid + 1, entries.end());
 
   if (!left->isLeaf) {
-    std::vector<Node*> children = left->children;
-    children.insert(children.end(), right->children.begin(), right->children.end());
+    std::vector<Node *> children = left->children;
+    children.insert(children.end(), right->children.begin(),
+                    right->children.end());
 
     int leftChildCount = static_cast<int>(left->entries.size()) + 1;
 
@@ -260,22 +288,22 @@ bool BStarTree::redistributeOverflow(Node* parent, int childIndex) {
   return true;
 }
 
-void BStarTree::concatenation(Node* parent, int childIndex) {
+void BStarTree::concatenation(Node *parent, int childIndex) {
   int startIndex = -1;
   int childCount = static_cast<int>(parent->children.size());
 
   for (int candidate : {childIndex - 2, childIndex - 1, childIndex}) {
-    if (candidate < 0 || candidate + 2 >= childCount) { continue; }
+    if (candidate < 0 || candidate + 2 >= childCount) {
+      continue;
+    }
 
-    Node* first = parent->children[candidate];
-    Node* second = parent->children[candidate + 1];
-    Node* third = parent->children[candidate + 2];
+    Node *first = parent->children[candidate];
+    Node *second = parent->children[candidate + 1];
+    Node *third = parent->children[candidate + 2];
 
-    int total =
-        static_cast<int>(first->entries.size()) +
-        static_cast<int>(second->entries.size()) +
-        static_cast<int>(third->entries.size()) +
-        2;
+    int total = static_cast<int>(first->entries.size()) +
+                static_cast<int>(second->entries.size()) +
+                static_cast<int>(third->entries.size()) + 2;
 
     int childEntryCount = total - 1;
     if (childEntryCount >= 2 * minEntries() &&
@@ -287,14 +315,16 @@ void BStarTree::concatenation(Node* parent, int childIndex) {
 
   if (startIndex == -1) {
     int leftIndex = (childIndex > 0) ? childIndex - 1 : childIndex;
-    Node* left = parent->children[leftIndex];
-    Node* right = parent->children[leftIndex + 1];
+    Node *left = parent->children[leftIndex];
+    Node *right = parent->children[leftIndex + 1];
 
     left->entries.push_back(parent->entries[leftIndex]);
-    left->entries.insert(left->entries.end(), right->entries.begin(), right->entries.end());
+    left->entries.insert(left->entries.end(), right->entries.begin(),
+                         right->entries.end());
 
     if (!left->isLeaf) {
-      left->children.insert(left->children.end(), right->children.begin(), right->children.end());
+      left->children.insert(left->children.end(), right->children.begin(),
+                            right->children.end());
     }
 
     parent->entries.erase(parent->entries.begin() + leftIndex);
@@ -303,9 +333,9 @@ void BStarTree::concatenation(Node* parent, int childIndex) {
     return;
   }
 
-  Node* first = parent->children[startIndex];
-  Node* second = parent->children[startIndex + 1];
-  Node* third = parent->children[startIndex + 2];
+  Node *first = parent->children[startIndex];
+  Node *second = parent->children[startIndex + 1];
+  Node *third = parent->children[startIndex + 2];
 
   std::vector<Entry> entries = first->entries;
   entries.push_back(parent->entries[startIndex]);
@@ -315,7 +345,9 @@ void BStarTree::concatenation(Node* parent, int childIndex) {
 
   int childEntryCount = static_cast<int>(entries.size()) - 1;
   int leftEntryCount = (childEntryCount + 1) / 2;
-  if (leftEntryCount > maxEntries()) { leftEntryCount = maxEntries(); }
+  if (leftEntryCount > maxEntries()) {
+    leftEntryCount = maxEntries();
+  }
   if (childEntryCount - leftEntryCount < minEntries()) {
     leftEntryCount = childEntryCount - minEntries();
   }
@@ -325,13 +357,16 @@ void BStarTree::concatenation(Node* parent, int childIndex) {
   second->entries.assign(entries.begin() + leftEntryCount + 1, entries.end());
 
   if (!first->isLeaf) {
-    std::vector<Node*> children = first->children;
-    children.insert(children.end(), second->children.begin(), second->children.end());
-    children.insert(children.end(), third->children.begin(), third->children.end());
+    std::vector<Node *> children = first->children;
+    children.insert(children.end(), second->children.begin(),
+                    second->children.end());
+    children.insert(children.end(), third->children.begin(),
+                    third->children.end());
 
     int firstChildCount = static_cast<int>(first->entries.size()) + 1;
 
-    first->children.assign(children.begin(), children.begin() + firstChildCount);
+    first->children.assign(children.begin(),
+                           children.begin() + firstChildCount);
     second->children.assign(children.begin() + firstChildCount, children.end());
   }
 
@@ -340,7 +375,7 @@ void BStarTree::concatenation(Node* parent, int childIndex) {
   delete third;
 }
 
-bool BStarTree::redistribution2(Node* parent, int childIndex) {
+bool BStarTree::redistribution2(Node *parent, int childIndex) {
   int leftIndex = -1;
 
   for (int candidate : {childIndex - 1, childIndex}) {
@@ -349,12 +384,10 @@ bool BStarTree::redistribution2(Node* parent, int childIndex) {
       continue;
     }
 
-    Node* left = parent->children[candidate];
-    Node* right = parent->children[candidate + 1];
-    int total =
-        static_cast<int>(left->entries.size()) +
-        1 +
-        static_cast<int>(right->entries.size());
+    Node *left = parent->children[candidate];
+    Node *right = parent->children[candidate + 1];
+    int total = static_cast<int>(left->entries.size()) + 1 +
+                static_cast<int>(right->entries.size());
 
     if (total >= 2 * minEntries() + 1) {
       leftIndex = candidate;
@@ -362,10 +395,12 @@ bool BStarTree::redistribution2(Node* parent, int childIndex) {
     }
   }
 
-  if (leftIndex == -1) { return false; }
+  if (leftIndex == -1) {
+    return false;
+  }
 
-  Node* left = parent->children[leftIndex];
-  Node* right = parent->children[leftIndex + 1];
+  Node *left = parent->children[leftIndex];
+  Node *right = parent->children[leftIndex + 1];
 
   std::vector<Entry> entries = left->entries;
   entries.push_back(parent->entries[leftIndex]);
@@ -378,8 +413,9 @@ bool BStarTree::redistribution2(Node* parent, int childIndex) {
   right->entries.assign(entries.begin() + mid + 1, entries.end());
 
   if (!left->isLeaf) {
-    std::vector<Node*> children = left->children;
-    children.insert(children.end(), right->children.begin(), right->children.end());
+    std::vector<Node *> children = left->children;
+    children.insert(children.end(), right->children.begin(),
+                    right->children.end());
 
     int leftChildCount = static_cast<int>(left->entries.size()) + 1;
 
@@ -390,22 +426,22 @@ bool BStarTree::redistribution2(Node* parent, int childIndex) {
   return true;
 }
 
-bool BStarTree::redistribution3(Node* parent, int childIndex) {
+bool BStarTree::redistribution3(Node *parent, int childIndex) {
   int startIndex = -1;
   int childCount = static_cast<int>(parent->children.size());
 
   for (int candidate : {childIndex - 2, childIndex - 1, childIndex}) {
-    if (candidate < 0 || candidate + 2 >= childCount) { continue; }
+    if (candidate < 0 || candidate + 2 >= childCount) {
+      continue;
+    }
 
-    Node* first = parent->children[candidate];
-    Node* second = parent->children[candidate + 1];
-    Node* third = parent->children[candidate + 2];
+    Node *first = parent->children[candidate];
+    Node *second = parent->children[candidate + 1];
+    Node *third = parent->children[candidate + 2];
 
-    int total =
-        static_cast<int>(first->entries.size()) +
-        static_cast<int>(second->entries.size()) +
-        static_cast<int>(third->entries.size()) +
-        2;
+    int total = static_cast<int>(first->entries.size()) +
+                static_cast<int>(second->entries.size()) +
+                static_cast<int>(third->entries.size()) + 2;
 
     int childEntryCount = total - 2;
     if (childEntryCount >= 3 * minEntries() &&
@@ -415,11 +451,13 @@ bool BStarTree::redistribution3(Node* parent, int childIndex) {
     }
   }
 
-  if (startIndex == -1) { return false; }
+  if (startIndex == -1) {
+    return false;
+  }
 
-  Node* first = parent->children[startIndex];
-  Node* second = parent->children[startIndex + 1];
-  Node* third = parent->children[startIndex + 2];
+  Node *first = parent->children[startIndex];
+  Node *second = parent->children[startIndex + 1];
+  Node *third = parent->children[startIndex + 2];
 
   std::vector<Entry> entries = first->entries;
   entries.push_back(parent->entries[startIndex]);
@@ -441,9 +479,11 @@ bool BStarTree::redistribution3(Node* parent, int childIndex) {
   third->entries.assign(entries.begin() + secondUpIndex + 1, entries.end());
 
   if (!first->isLeaf) {
-    std::vector<Node*> children = first->children;
-    children.insert(children.end(), second->children.begin(), second->children.end());
-    children.insert(children.end(), third->children.begin(), third->children.end());
+    std::vector<Node *> children = first->children;
+    children.insert(children.end(), second->children.begin(),
+                    second->children.end());
+    children.insert(children.end(), third->children.begin(),
+                    third->children.end());
 
     int firstChildEnd = firstUpIndex + 1;
     int secondChildEnd = secondUpIndex + 1;
@@ -457,20 +497,26 @@ bool BStarTree::redistribution3(Node* parent, int childIndex) {
   return true;
 }
 
-void BStarTree::handleUnderflow(Node* node, std::vector<std::pair<Node*, int>>& path) {
-  while (node != root && static_cast<int>(node->entries.size()) < minEntries()) {
+void BStarTree::handleUnderflow(Node *node,
+                                std::vector<std::pair<Node *, int>> &path) {
+  while (node != root &&
+         static_cast<int>(node->entries.size()) < minEntries()) {
     auto [parent, childIndex] = path.back();
     path.pop_back();
 
-    if (redistribution2(parent, childIndex)) { return; }
-    if (redistribution3(parent, childIndex)) { return; }
+    if (redistribution2(parent, childIndex)) {
+      return;
+    }
+    if (redistribution3(parent, childIndex)) {
+      return;
+    }
 
     concatenation(parent, childIndex);
     node = parent;
   }
 
   if (root != nullptr && root->entries.empty()) {
-    Node* oldRoot = root;
+    Node *oldRoot = root;
 
     if (root->isLeaf) {
       root = nullptr;

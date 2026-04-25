@@ -21,38 +21,38 @@ private:
 
   struct InternalNode : Node {
     std::vector<int> keys;
-    std::vector<Node*> children;
+    std::vector<Node *> children;
 
     InternalNode();
   };
 
   struct LeafNode : Node {
     std::vector<Entry> entries;
-    LeafNode* next;
+    LeafNode *next;
 
     LeafNode();
   };
 
-  Node* root;
+  Node *root;
 
   // capacity helper function
-  int minEntries() const override {
-    return (order + 1) / 2 - 1;
-  }
+  int minEntries() const override { return (order + 1) / 2 - 1; }
 
   // search() helper functions
-  int findIndex(const std::vector<int>& keys, int key) const;
-  int findIndex(const std::vector<Entry>& entries, int key) const;
-  int search(Node* node, int key) const;
+  int findIndex(const std::vector<int> &keys, int key) const;
+  int findIndex(const std::vector<Entry> &entries, int key) const;
+  int search(Node *node, int key) const;
 
   // insert() helper functions
-  int splitNode(Node* node, Node*& rightNode);
-  void handleOverflow(Node* node, std::vector<std::pair<InternalNode*, int>>& path);
+  int splitNode(Node *node, Node *&rightNode);
+  void handleOverflow(Node *node,
+                      std::vector<std::pair<InternalNode *, int>> &path);
 
   // remove() helper functions
-  void concatenation(InternalNode* parent, int leftIndex);
-  void redistribution(InternalNode* parent, int leftIndex);
-  void handleUnderflow(Node* node, std::vector<std::pair<InternalNode*, int>>& path);
+  void concatenation(InternalNode *parent, int leftIndex);
+  void redistribution(InternalNode *parent, int leftIndex);
+  void handleUnderflow(Node *node,
+                       std::vector<std::pair<InternalNode *, int>> &path);
 
 public:
   explicit BPlusTree(int order);
