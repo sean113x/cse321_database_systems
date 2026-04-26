@@ -27,10 +27,9 @@ BTree::~BTree() {
 
 /*
   Main functions:
-  - search(): return the rid associated with the given key, or -1 if not found.
-  - insert(): insert the key-rid pair into the B-Tree.
-  - remove(): remove the key and its associated rid from the B-Tree. If the key
-  does not exist, do nothing.
+  - search(): retrieve the key-rid pair.
+  - insert(): insert the key-rid pair into leaf node.
+  - remove(): remove the key-rid pair.
 */
 
 int BTree::search(int key) const { return search(root, key); }
@@ -114,15 +113,14 @@ void BTree::remove(int key) {
 
 /*
   Helper functions:
-  - findIndex(): return the index of the first entry whose key is equal to or
-  greater than to the given key.
-  - search(): recursive helper for search().
-  - splitNode(): split the given node and return the promoted entry.
-  - handleOverflow(): check if the node has overflowed.
-  - concatenation(): concatenate the child at childIndex with its sibling.
-  - redistribution(): redistribute entries between the child at childIndex and
-  its sibling.
-  - handleUnderflow(): check if the node has under-flowed.
+  - findIndex(): find the first key that is >= the given key.
+  - search(): recursively perform search.
+  - splitNode(): split the node and return the separator.
+  - handleOverflow(): handle the overflow by splitting node.
+  - concatenation(): merge the child and its right sibling.
+  - redistribution(): redistribute entries between the child and its right
+  sibling.
+  - handleUnderflow(): handle the underflow by concatenation or redistribution.
 */
 
 int BTree::findIndex(const std::vector<Entry> &entries, int key) const {

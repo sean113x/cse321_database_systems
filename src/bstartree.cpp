@@ -27,10 +27,9 @@ BStarTree::~BStarTree() {
 
 /*
   Main functions: (same as B-tree)
-  - search(): return the rid associated with the given key, or -1 if not found.
-  - insert(): insert the key-rid pair into the B*-Tree.
-  - remove(): remove the key and its associated rid from the B*-Tree. If the key
-  does not exist, do nothing.
+  - search(): retrieve the key-rid pair.
+  - insert(): insert the key-rid pair into leaf node.
+  - remove(): remove the key-rid pair.
 */
 
 int BStarTree::search(int key) const { return search(root, key); }
@@ -114,20 +113,16 @@ void BStarTree::remove(int key) {
 
 /*
   Helper functions:
-  - findIndex(): return the index of the first entry whose key is equal to or
-  greater than to the given key.
-  - search(): recursive helper for search().
-
-  - splitNode(): split two full sibling nodes into three nodes.
+  - findIndex(): find the first key that is >= the given key.
+  - search(): recursively perform search.
+  - splitNode(): split two full sibling nodes into three nodes (2-to-3 split).
   - redistributeOverflow(): redistribute entries with a sibling before
   splitting.
-  - handleOverflow(): check if the node has overflowed.
-
-  - concatenation(): concatenate neighboring nodes when redistribution is not
-  possible.
+  - handleOverflow(): handle the overflow by splitting node.
+  - concatenation(): merge the child and its right sibling.
   - redistribution2(): redistribute entries between two neighboring children.
   - redistribution3(): redistribute entries among three neighboring children.
-  - handleUnderflow(): check if the node has underflowed.
+  - handleUnderflow(): handle the underflow by concatenation or redistributions.
 */
 
 int BStarTree::findIndex(const std::vector<Entry> &entries,

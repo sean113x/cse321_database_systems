@@ -41,7 +41,7 @@ private:
   // search() helper functions
   int findIndex(const std::vector<int> &keys, int key) const;
   int findIndex(const std::vector<Entry> &entries, int key) const;
-  int search(Node *node, int key) const;
+  std::pair<LeafNode *, int> search(Node *node, int key) const;
 
   // insert() helper functions
   int splitNode(Node *node, Node *&rightNode);
