@@ -54,9 +54,30 @@ int BPlusTree::search(int key) const {
   return -1;
 }
 
-std::vector<int> BPlusTree::search_range(int, int) const {
-  // TODO
-  return {};
+std::vector<int> BPlusTree::search_range(int startKey, int endKey) const {
+  std::vector<int> rids;
+
+  if (startKey > endKey) {
+    return rids;
+  }
+
+  auto [leaf, index] = search(root, startKey);
+
+  while (leaf != nullptr) {
+    while (index < static_cast<int>(leaf->entries.size())) {
+      if (leaf->entries[index].key > endKey) {
+        return rids;
+      }
+
+      rids.push_back(leaf->entries[index].rid);
+      index++;
+    }
+
+    leaf = leaf->next;
+    index = 0;
+  }
+
+  return rids;
 }
 
 void BPlusTree::insert(int key, int rid) {
