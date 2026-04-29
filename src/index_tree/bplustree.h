@@ -73,6 +73,5 @@ public:
   int getNumInternalKey() const { return numInternalKey; }
   // Uses both leaf data entries and internal separator keys.
   double overallNodeUtilization() const;
-  double getLeafNodeUtilization() const;
   double getNodeUtilization() const override;
 };

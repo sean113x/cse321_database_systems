@@ -103,28 +103,6 @@ double BPlusTree::overallNodeUtilization() const {
          static_cast<double>(numNode * maxEntries());
 }
 
-double BPlusTree::getLeafNodeUtilization() const {
-  if (root == nullptr) {
-    return 0.0;
-  }
-
-  Node *current = root;
-  while (!current->isLeaf) {
-    auto *internal = static_cast<InternalNode *>(current);
-    current = internal->children.front();
-  }
-
-  int numLeafNode = 0;
-  auto *leaf = static_cast<LeafNode *>(current);
-
-  while (leaf != nullptr) {
-    numLeafNode++;
-    leaf = leaf->next;
-  }
-
-  return 100.0 * numEntry / (numLeafNode * maxEntries());
-}
-
 double BPlusTree::getNodeUtilization() const {
   return 100.0 * overallNodeUtilization();
 }
