@@ -21,7 +21,9 @@ public:
   void addRecord(std::vector<std::string> values);
   int size() const;
   const std::string &getKeyHeader() const;
+  int getColumnIndex(const std::string &header) const;
   int getKey(int rid) const;
+  const std::string &getValue(int rid, int columnIndex) const;
   std::string getRecordString(int rid) const;
 };
 

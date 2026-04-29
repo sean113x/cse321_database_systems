@@ -34,6 +34,16 @@ int Dataset::size() const { return static_cast<int>(records.size()); }
 
 const std::string &Dataset::getKeyHeader() const { return headers[keyIndex]; }
 
+int Dataset::getColumnIndex(const std::string &header) const {
+  for (int index = 0; index < static_cast<int>(headers.size()); ++index) {
+    if (headers[index] == header) {
+      return index;
+    }
+  }
+
+  throw std::runtime_error("Column does not exist: " + header);
+}
+
 int Dataset::getKey(int rid) const {
   const Record &record = findRecord(rid);
 
@@ -42,6 +52,16 @@ int Dataset::getKey(int rid) const {
   }
 
   return std::stoi(record.values[keyIndex]);
+}
+
+const std::string &Dataset::getValue(int rid, int columnIndex) const {
+  const Record &record = findRecord(rid);
+
+  if (columnIndex < 0 || columnIndex >= static_cast<int>(record.values.size())) {
+    throw std::runtime_error("Record does not have the requested value");
+  }
+
+  return record.values[columnIndex];
 }
 
 std::string Dataset::getRecordString(int rid) const {

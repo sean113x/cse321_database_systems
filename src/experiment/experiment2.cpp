@@ -24,12 +24,25 @@ namespace {
 constexpr int queryCount = 10000;
 constexpr int warmupRuns = 10;
 constexpr int minMeasuredRuns = 30;
-constexpr int maxSeed = 100;
-constexpr double targetRsd = 0.01;
+constexpr int maxRuns = 200;
+constexpr int searchRepeats = 10;
+constexpr double targetRsd = 0.02;
 
 struct TreeSpec {
   const char *name;
   int type;
+};
+
+struct RunState {
+  const TreeSpec *spec;
+  std::unique_ptr<IndexTree> tree;
+  std::vector<double> executionTimes;
+  double avg = 0.0;
+  double sd = 0.0;
+  double rsd = 0.0;
+  bool done = false;
+
+  explicit RunState(const TreeSpec *spec) : spec(spec) {}
 };
 
 std::unique_ptr<IndexTree> createTree(int type, int order) {
@@ -96,13 +109,17 @@ std::vector<int> makeQueries(const std::vector<int> &keys, int seed) {
 
 long long searchTree(IndexTree &tree, const std::vector<int> &queries,
                      long long &checksum) {
-  auto start = std::chrono::steady_clock::now();
-  for (int key : queries) {
-    checksum += tree.search(key);
+  auto start = std::chrono::steady_clock::now(); // start timer
+  for (int repeat = 0; repeat < searchRepeats; repeat++) {
+    for (int key : queries) {
+      checksum += tree.search(key);
+    }
   }
-  auto end = std::chrono::steady_clock::now();
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
-      .count();
+  auto end = std::chrono::steady_clock::now(); // end timer
+  long long batchNs =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+          .count();
+  return batchNs / searchRepeats;
 }
 } // namespace
 
@@ -119,7 +136,7 @@ int runExperiment2() {
   }
 
   std::vector<std::vector<int>> querySets;
-  for (int seed = 1; seed <= maxSeed; ++seed) {
+  for (int seed = 1; seed <= warmupRuns + maxRuns; ++seed) {
     querySets.push_back(makeQueries(keys, seed));
   }
 
@@ -140,55 +157,73 @@ int runExperiment2() {
   std::cout << "Records: " << keys.size() << ", queries per run: " << queryCount
             << "\n\n";
 
-  for (const TreeSpec &spec : trees) {
-    for (int order : orders) {
-      auto tree = createTree(spec.type, order);
-      buildTree(*tree, keys);
+  for (int order : orders) {
+    std::vector<RunState> states;
+    for (const TreeSpec &spec : trees) {
+      states.emplace_back(&spec);
+      states.back().tree = createTree(spec.type, order);
+      buildTree(*states.back().tree, keys);
+    }
 
-      for (int seed = 1; seed <= warmupRuns; ++seed) {
+    for (int seed = 1; seed <= warmupRuns; ++seed) {
+      for (RunState &state : states) {
         long long checksum = 0;
-        searchTree(*tree, querySets[seed - 1], checksum);
+        searchTree(*state.tree, querySets[seed - 1], checksum);
       }
+    }
 
-      std::vector<double> executionTimes;
-      double avg = 0.0;
-      double sd = 0.0;
-      double rsd = 0.0;
+    for (int seed = warmupRuns + 1; seed <= warmupRuns + maxRuns; ++seed) {
+      bool allDone = true;
 
-      for (int seed = warmupRuns + 1; seed <= maxSeed; ++seed) {
+      for (RunState &state : states) {
+        if (state.done) {
+          continue;
+        }
+
         long long checksum = 0;
-        long long ns = searchTree(*tree, querySets[seed - 1], checksum);
-        executionTimes.push_back(static_cast<double>(ns));
-        avg = mean(executionTimes);
-        sd = stddev(executionTimes, avg);
-        rsd = sd / avg;
+        long long ns = searchTree(*state.tree, querySets[seed - 1], checksum);
+        state.executionTimes.push_back(static_cast<double>(ns));
+        state.avg = mean(state.executionTimes);
+        state.sd = stddev(state.executionTimes, state.avg);
+        state.rsd = state.sd / state.avg;
 
-        runFile << spec.name << ',' << order << ',' << seed << ',' << queryCount
-                << ',' << ns << ',' << checksum << '\n';
+        runFile << state.spec->name << ',' << order << ',' << seed << ','
+                << queryCount << ',' << ns << ',' << checksum << '\n';
 
-        if (static_cast<int>(executionTimes.size()) >= minMeasuredRuns &&
-            rsd < targetRsd) {
-          break;
+        if (static_cast<int>(state.executionTimes.size()) >= minMeasuredRuns &&
+            state.rsd < targetRsd) {
+          state.done = true;
         }
       }
 
-      double med = median(executionTimes);
-      double meanMs = avg / 1000000.0;
+      for (const RunState &state : states) {
+        allDone = allDone && state.done;
+      }
+      if (allDone) {
+        break;
+      }
+    }
+
+    for (const RunState &state : states) {
+      double med = median(state.executionTimes);
+      double meanMs = state.avg / 1000000.0;
       double medianMs = med / 1000000.0;
 
-      summaryFile << spec.name << ',' << order << ',' << keys.size() << ','
-                  << queryCount << ',' << warmupRuns << ','
-                  << executionTimes.size() << ',' << avg << ',' << med << ','
-                  << sd << ',' << rsd << ',' << meanMs << ',' << medianMs << ','
-                  << tree->getSplitCount() << ',' << tree->getHeight() << ','
-                  << tree->getNumNode() << ',' << tree->getNumEntry() << ','
-                  << tree->getNodeUtilization() << '\n';
+      summaryFile << state.spec->name << ',' << order << ',' << keys.size()
+                  << ',' << queryCount << ',' << warmupRuns << ','
+                  << state.executionTimes.size() << ',' << state.avg << ','
+                  << med << ',' << state.sd << ',' << state.rsd << ',' << meanMs
+                  << ',' << medianMs << ',' << state.tree->getSplitCount()
+                  << ',' << state.tree->getHeight() << ','
+                  << state.tree->getNumNode() << ','
+                  << state.tree->getNumEntry() << ','
+                  << state.tree->getNodeUtilization() << '\n';
 
-      std::cout << spec.name << " order=" << order
-                << " runs=" << executionTimes.size()
+      std::cout << state.spec->name << " order=" << order
+                << " runs=" << state.executionTimes.size()
                 << " median_ms=" << medianMs << " mean_ms=" << meanMs
-                << " rsd=" << rsd << " height=" << tree->getHeight()
-                << " utilization=" << tree->getNodeUtilization() << "%\n";
+                << " rsd=" << state.rsd << " height=" << state.tree->getHeight()
+                << " utilization=" << state.tree->getNodeUtilization() << "%\n";
     }
   }
 
