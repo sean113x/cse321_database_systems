@@ -1,5 +1,6 @@
 #include "dataset_handler/dataset.h"
 #include "experiment/experiment1.h"
+#include "experiment/experiment2.h"
 #include "index_tree/bplustree.h"
 #include "index_tree/bstartree.h"
 #include "index_tree/btree.h"
@@ -137,7 +138,7 @@ int runTestMode() {
 int runExperimentMode() {
   std::cout << "Experiments:\n";
   std::cout << "  1. Insertion & Parameter Tuning\n";
-  std::cout << "  2. Point Search Performance (not implemented yet)\n";
+  std::cout << "  2. Point Search Performance\n";
   std::cout << "  3. Range Query Performance (not implemented yet)\n";
   std::cout << "  4. Deletion Performance (not implemented yet)\n";
 
@@ -146,8 +147,11 @@ int runExperimentMode() {
   if (experiment == "1") {
     return runExperiment1();
   }
+  if (experiment == "2") {
+    return runExperiment2();
+  }
 
-  if (experiment == "2" || experiment == "3" || experiment == "4") {
+  if (experiment == "3" || experiment == "4") {
     std::cout << "Experiment " << experiment
               << " is not implemented yet.\n";
     return 0;

@@ -21,8 +21,8 @@
 namespace {
 constexpr int warmupRuns = 10;
 constexpr int minMeasuredRuns = 30;
-constexpr int maxMeasuredRuns = 200;
-constexpr double targetRsd = 0.02;
+constexpr int maxMeasuredRuns = 100;
+constexpr double targetRsd = 0.01;
 
 struct TreeSpec {
   const char *name;
@@ -64,16 +64,17 @@ double stddev(const std::vector<double> &values, double avg) {
     double diff = value - avg;
     sum += diff * diff;
   }
-  return values.size() < 2 ? 0.0
-                           : std::sqrt(sum / static_cast<double>(values.size() - 1));
+  return values.size() < 2
+             ? 0.0
+             : std::sqrt(sum / static_cast<double>(values.size() - 1));
 }
 
 long long buildTree(IndexTree &tree, const std::vector<int> &keys) {
-  auto start = std::chrono::steady_clock::now();
+  auto start = std::chrono::steady_clock::now(); // start timer
   for (int rid = 0; rid < static_cast<int>(keys.size()); ++rid) {
     tree.insert(keys[rid], rid);
   }
-  auto end = std::chrono::steady_clock::now();
+  auto end = std::chrono::steady_clock::now(); // end timer
   return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
       .count();
 }
@@ -86,7 +87,8 @@ void createResultsDirectory() {
 } // namespace
 
 int runExperiment1() {
-  const std::vector<TreeSpec> trees = {{"btree", 1}, {"bstar", 2}, {"bplus", 3}};
+  const std::vector<TreeSpec> trees = {
+      {"btree", 1}, {"bstar", 2}, {"bplus", 3}};
   const std::vector<int> orders = {3, 5, 10, 16, 32, 64, 128, 256, 512, 1024};
 
   Dataset dataset = loadDataset("data/student.csv");
@@ -153,10 +155,10 @@ int runExperiment1() {
                   << tree->getNumEntry() << ',' << tree->getNodeUtilization()
                   << '\n';
 
-      std::cout << spec.name << " order=" << order << " runs="
-                << executionTimes.size() << " median_ms=" << medianMs
-                << " mean_ms=" << meanMs << " rsd=" << rsd
-                << " splits=" << tree->getSplitCount()
+      std::cout << spec.name << " order=" << order
+                << " runs=" << executionTimes.size()
+                << " median_ms=" << medianMs << " mean_ms=" << meanMs
+                << " rsd=" << rsd << " splits=" << tree->getSplitCount()
                 << " height=" << tree->getHeight()
                 << " utilization=" << tree->getNodeUtilization() << "%\n";
     }
