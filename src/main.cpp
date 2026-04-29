@@ -4,6 +4,7 @@
 #include "index_tree/btree.h"
 
 #include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -62,7 +63,12 @@ int runTestMode() {
   std::cout << "Key = " << keyHeader << ", RID = array index\n";
   std::cout << "Tree order = " << tree->getOrder() << '\n';
   std::cout << "Build time = " << buildMs << " ms\n";
-  std::cout << "Split count = " << tree->getSplitCount() << "\n\n";
+  std::cout << "Split count = " << tree->getSplitCount() << '\n';
+  std::cout << "Number of nodes = " << tree->getNumNode() << '\n';
+  std::cout << "Number of entries = " << tree->getNumEntry() << '\n';
+  std::cout << "Node utilization = " << std::fixed << std::setprecision(2)
+            << tree->getNodeUtilization() << "%\n";
+  std::cout << '\n';
   printOperations(keyHeader);
 
   std::string line;

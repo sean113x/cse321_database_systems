@@ -88,6 +88,8 @@ void BPlusTree::insert(int key, int rid) {
     auto *leaf = new LeafNode();
     leaf->entries.push_back(newEntry);
     root = leaf;
+    numNode++;
+    numEntry++;
     return;
   }
 
@@ -117,6 +119,7 @@ void BPlusTree::insert(int key, int rid) {
   }
 
   leaf->entries.insert(leaf->entries.begin() + index, newEntry);
+  numEntry++;
   handleOverflow(leaf, path);
 }
 
@@ -150,6 +153,7 @@ void BPlusTree::remove(int key) {
   }
 
   leaf->entries.erase(leaf->entries.begin() + index);
+  numEntry--;
   handleUnderflow(leaf, path);
 
   auto refreshSeparators = [](auto &&self, Node *node) -> int {
@@ -232,6 +236,7 @@ int BPlusTree::splitNode(Node *node, Node *&rightNode) {
   if (node->isLeaf) {
     auto *leaf = static_cast<LeafNode *>(node);
     auto *rightLeaf = new LeafNode();
+    numNode++;
     int mid = static_cast<int>(leaf->entries.size()) / 2;
 
     rightLeaf->entries.assign(leaf->entries.begin() + mid, leaf->entries.end());
@@ -247,6 +252,7 @@ int BPlusTree::splitNode(Node *node, Node *&rightNode) {
 
   auto *internal = static_cast<InternalNode *>(node);
   auto *rightInternal = new InternalNode();
+  numNode++;
   int mid = static_cast<int>(internal->keys.size()) / 2;
   int upKey = internal->keys[mid];
 
@@ -259,6 +265,7 @@ int BPlusTree::splitNode(Node *node, Node *&rightNode) {
   internal->children.resize(mid + 1);
   rightNode = rightInternal;
 
+  numEntry--; // internal split moves the separator up.
   splitCount++;
   return upKey;
 }
@@ -279,10 +286,12 @@ void BPlusTree::handleOverflow(
 
     if (path.empty()) {
       auto *newRoot = new InternalNode();
+      numNode++;
       newRoot->keys.push_back(upKey);
       newRoot->children.push_back(node);
       newRoot->children.push_back(rightNode);
       root = newRoot;
+      numEntry++;
       return;
     }
 
@@ -292,6 +301,7 @@ void BPlusTree::handleOverflow(
     parent->keys.insert(parent->keys.begin() + childIndex, upKey);
     parent->children.insert(parent->children.begin() + childIndex + 1,
                             rightNode);
+    numEntry++;
     node = parent;
   }
 }
@@ -312,6 +322,7 @@ void BPlusTree::concatenation(InternalNode *parent, int leftIndex) {
                              rightLeaf->entries.begin(),
                              rightLeaf->entries.end());
     leftLeaf->next = rightLeaf->next;
+    numEntry--;
   } else {
     auto *leftInternal = static_cast<InternalNode *>(left);
     auto *rightInternal = static_cast<InternalNode *>(right);
@@ -326,6 +337,7 @@ void BPlusTree::concatenation(InternalNode *parent, int leftIndex) {
   }
 
   delete right;
+  numNode--;
 }
 
 void BPlusTree::redistribution(InternalNode *parent, int leftIndex) {
@@ -428,6 +440,7 @@ void BPlusTree::handleUnderflow(
     if (leaf->entries.empty()) {
       delete root;
       root = nullptr;
+      numNode--;
     }
 
     return;
@@ -439,5 +452,6 @@ void BPlusTree::handleUnderflow(
     Node *oldRoot = root;
     root = internal->children.front();
     delete oldRoot;
+    numNode--;
   }
 }
