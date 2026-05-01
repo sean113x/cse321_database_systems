@@ -143,7 +143,8 @@ The result files include execution time, node-read counts, simulated SSD cost, t
 
 ## Experiments
 
-> Warning: Experiments can take some time because each tree type and tree order is measured repeatedly. The code runs 10 warm-up runs and then 30 to 200 measured runs, stopping early only when the relative standard deviation (`rsd`) is below `0.02`.
+> [!WARNING]
+> Experiments can take some time because each tree type and tree order is measured repeatedly. The code runs 10 warm-up runs and then 30 to 200 measured runs, stopping early only when the relative standard deviation (`rsd`) is below `0.02`.
 
 #### Experiment 1: Insertion & Parameter Tuning
 
