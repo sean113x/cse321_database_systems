@@ -41,11 +41,7 @@ make
 
 This compiles the project into the `project1` executable.
 
-#### Clean build artifacts
-
-```bash
-make clean
-```
+You can also clean build artifacts by `make clean`.
 
 ## Usage
 
