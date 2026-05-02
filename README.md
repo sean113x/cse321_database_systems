@@ -12,7 +12,7 @@ The project consists of the following main components:
 
 - A C++ compiler with C++20 support
 - `make` to build the executable from the provided `Makefile`
-- Tested successfully on a MacBook Pro with an Apple M1 Pro chip. If you need to borrow this machine for building or testing, contact me at `sean113x@unist.ac.kr`.
+- Tested successfully on a MacBook Pro with an Apple M1 Pro chip. If you need to borrow this machine for building or testing, contact me at **sean113x@unist.ac.kr**.
 
 ## Orientation
 
