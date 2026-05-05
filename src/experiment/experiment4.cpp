@@ -117,6 +117,14 @@ void buildTree(IndexTree &tree, const std::vector<int> &keys) {
   }
 }
 
+void buildTree(IndexTree &tree, const std::vector<int> &keys, int recordCount) {
+  int boundedRecordCount =
+      std::min(recordCount, static_cast<int>(keys.size()));
+  for (int rid = 0; rid < boundedRecordCount; ++rid) {
+    tree.insert(keys[rid], rid);
+  }
+}
+
 TreeStats getStats(IndexTree &tree) {
   return {tree.getHeight(), tree.getNumNode(), tree.getNumEntry(),
           tree.getNodeUtilization()};
@@ -166,6 +174,67 @@ int countFoundKeys(IndexTree &tree, const std::vector<int> &keys) {
   }
   return found;
 }
+
+void writeUtilizationSnapshot(std::ofstream &file, const TreeSpec &spec,
+                              int order, const char *scenario,
+                              const char *operation, int initialRecords,
+                              int deleteCount, int seed,
+                              const TreeStats &stats) {
+  file << spec.name << ',' << order << ',' << scenario << ',' << operation
+       << ',' << initialRecords << ',' << deleteCount << ','
+       << stats.numEntries << ',' << seed << ',' << stats.height << ','
+       << stats.numNodes << ',' << stats.numEntries << ','
+       << stats.nodeUtilization << '\n';
+}
+
+void writeUtilizationScenarios(std::ofstream &file,
+                               const std::vector<TreeSpec> &trees,
+                               const std::vector<int> &orders,
+                               const std::vector<int> &keys) {
+  constexpr int utilizationSeed = 1;
+  const int fullRecordCount = static_cast<int>(keys.size());
+  const int delete10Count = fullRecordCount / 10;
+  const int delete20Count = fullRecordCount / 5;
+
+  struct InsertScenario {
+    const char *name;
+    int recordCount;
+  };
+
+  const std::vector<InsertScenario> insertScenarios = {
+      {"insert_100000", fullRecordCount},
+      {"insert_90000", fullRecordCount - delete10Count},
+      {"insert_80000", fullRecordCount - delete20Count}};
+
+  const std::vector<WorkloadSpec> deleteScenarios = {
+      {"delete_10_percent", delete10Count},
+      {"delete_20_percent", delete20Count}};
+
+  file << "tree,order,scenario,operation,initial_records,delete_count,"
+       << "records,seed,height,num_nodes,num_entries,node_utilization\n";
+
+  for (int order : orders) {
+    for (const TreeSpec &spec : trees) {
+      for (const InsertScenario &scenario : insertScenarios) {
+        auto tree = createTree(spec.type, order);
+        buildTree(*tree, keys, scenario.recordCount);
+        writeUtilizationSnapshot(file, spec, order, scenario.name, "insert",
+                                 scenario.recordCount, 0, 0, getStats(*tree));
+      }
+
+      for (const WorkloadSpec &scenario : deleteScenarios) {
+        auto tree = createTree(spec.type, order);
+        buildTree(*tree, keys);
+        std::vector<int> deleteSet =
+            makeDeleteKeys(keys, utilizationSeed, scenario.deleteCount);
+        deleteKeys(*tree, deleteSet);
+        writeUtilizationSnapshot(file, spec, order, scenario.name, "delete",
+                                 fullRecordCount, scenario.deleteCount,
+                                 utilizationSeed, getStats(*tree));
+      }
+    }
+  }
+}
 } // namespace
 
 int runExperiment4() {
@@ -187,8 +256,11 @@ int runExperiment4() {
   createResultsDirectory();
   std::ofstream runFile("results_experiment/experiment4_runs.csv");
   std::ofstream summaryFile("results_experiment/experiment4_summary.csv");
+  std::ofstream utilizationFile(
+      "results_experiment/experiment4_utilization.csv");
   runFile << std::setprecision(12);
   summaryFile << std::setprecision(12);
+  utilizationFile << std::setprecision(12);
 
   runFile << "tree,order,workload,delete_count,seed,execution_time_ms,"
           << "node_read_count,sequential_leaf_read_count,"
@@ -203,11 +275,14 @@ int runExperiment4() {
               << "mean_simulated_ssd_cost_ms,median_simulated_ssd_cost_ms,"
               << "mean_total_time_with_ssd_ms,median_total_time_with_ssd_ms,"
               << "before_height,after_height,before_num_nodes,after_num_nodes,"
+              << "deleted_node_count,"
               << "before_num_entries,after_num_entries,"
               << "before_node_utilization,after_node_utilization,found_after\n";
 
   std::cout << "Experiment 4: Deletion & Structural Integrity\n";
   std::cout << "Records: " << keys.size() << "\n\n";
+
+  writeUtilizationScenarios(utilizationFile, trees, orders, keys);
 
   for (const WorkloadSpec &workload : workloads) {
     std::cout << "Workload: " << workload.name
@@ -304,7 +379,9 @@ int runExperiment4() {
                     << meanTotalWithSsd << ',' << medianTotalWithSsd << ','
                     << state.before.height << ',' << state.after.height << ','
                     << state.before.numNodes << ',' << state.after.numNodes
-                    << ',' << state.before.numEntries << ','
+                    << ','
+                    << state.before.numNodes - state.after.numNodes << ','
+                    << state.before.numEntries << ','
                     << state.after.numEntries << ','
                     << state.before.nodeUtilization << ','
                     << state.after.nodeUtilization << ',' << state.foundAfter
@@ -337,5 +414,6 @@ int runExperiment4() {
 
   std::cout << "\nSaved results_experiment/experiment4_runs.csv\n";
   std::cout << "Saved results_experiment/experiment4_summary.csv\n";
+  std::cout << "Saved results_experiment/experiment4_utilization.csv\n";
   return 0;
 }

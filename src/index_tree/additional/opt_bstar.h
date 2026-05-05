@@ -2,6 +2,7 @@
 
 #include "../index-tree.h"
 
+#include <cstddef>
 #include <utility>
 #include <vector>
 
@@ -13,7 +14,6 @@ public:
   };
 
   enum class OverflowPolicy {
-    DirectSplit,
     EagerRedistribution,
     SelectiveRedistribution,
   };
@@ -24,7 +24,6 @@ public:
     int hotKeyCacheCapacity;
     OverflowPolicy overflowPolicy;
     double selectiveRedistributionAlpha;
-    bool selectiveFallbackToDirectSplit;
 
     Options();
   };
@@ -35,10 +34,10 @@ public:
     long long hotKeyCacheHits = 0;
     long long hotKeyCacheMisses = 0;
     long long redistributionCount = 0;
+    long long forcedRedistributionCount = 0;
     long long skippedRedistributionCount = 0;
     long long redistributionMovedEntries = 0;
     long long twoToThreeSplitCount = 0;
-    long long directSplitCount = 0;
     long long rootSplitCount = 0;
   };
 
@@ -50,8 +49,9 @@ private:
   };
 
   struct HotKey {
-    int key;
-    int index;
+    int key = 0;
+    int index = 0;
+    bool valid = false;
   };
 
   struct Node {
@@ -82,8 +82,7 @@ private:
 
   // instrumentation helper functions
   void clearHotKeyCaches(Node *node) const;
-  bool isHotKeyUsable(const Node *node, const HotKey &hotKey,
-                      int key) const;
+  std::size_t hotKeyCacheSlot(int key) const;
   bool findInHotKeyCache(const Node *node, int key, int &index) const;
   void rememberHotKey(const Node *node, int key, int index) const;
 
@@ -99,14 +98,16 @@ private:
   void put_values(Node *node, int endKey, std::vector<int> &rids) const;
 
   // insert() helper functions
-  Entry splitNodeDirect(Node *node, Node *&rightNode);
+  Entry splitRootNode(Node *node, Node *&rightNode);
   void splitNodeTwoToThree(Node *parent, int leftIndex);
   int estimateRedistributionMoves(const Node *left, const Node *right) const;
   RedistributionCandidate chooseRedistributionCandidate(Node *parent,
                                                         int childIndex) const;
+  bool canSplitTwoToThree(Node *parent, int leftIndex) const;
+  int chooseTwoToThreeSplitLeftIndex(Node *parent, int childIndex) const;
   bool shouldRedistribute(const RedistributionCandidate &candidate) const;
-  bool redistributeOverflow(Node *parent, int childIndex);
-  void insertDirectSplitIntoParent(Node *parent, int childIndex);
+  void redistributeOverflow(Node *parent,
+                            const RedistributionCandidate &candidate);
   void splitRoot(Node *node);
   void handleOverflow(Node *node, std::vector<std::pair<Node *, int>> &path);
 
@@ -142,6 +143,9 @@ public:
   long long getRedistributionCount() const {
     return metrics.redistributionCount;
   }
+  long long getForcedRedistributionCount() const {
+    return metrics.forcedRedistributionCount;
+  }
   long long getSkippedRedistributionCount() const {
     return metrics.skippedRedistributionCount;
   }
@@ -151,6 +155,5 @@ public:
   long long getTwoToThreeSplitCount() const {
     return metrics.twoToThreeSplitCount;
   }
-  long long getDirectSplitCount() const { return metrics.directSplitCount; }
   long long getRootSplitCount() const { return metrics.rootSplitCount; }
 };

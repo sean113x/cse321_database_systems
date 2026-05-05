@@ -1,6 +1,7 @@
 #include "opt_bstar.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cmath>
 #include <cstdlib>
 #include <stdexcept>
@@ -13,8 +14,7 @@ OptBStarTree::Options::Options()
     : nodeSearchPolicy(NodeSearchPolicy::Linear), enableHotKeyCache(false),
       hotKeyCacheCapacity(4),
       overflowPolicy(OverflowPolicy::EagerRedistribution),
-      selectiveRedistributionAlpha(0.25),
-      selectiveFallbackToDirectSplit(true) {}
+      selectiveRedistributionAlpha(0.25) {}
 
 OptBStarTree::OptBStarTree(int order) : OptBStarTree(order, Options()) {}
 
@@ -180,9 +180,6 @@ void OptBStarTree::resetMetrics(bool clearHotKeyCache) const {
 }
 
 int OptBStarTree::rootMaxEntries() const {
-  if (options.overflowPolicy == OverflowPolicy::DirectSplit) {
-    return maxEntries();
-  }
   return 2 * minEntries();
 }
 
@@ -195,25 +192,26 @@ void OptBStarTree::clearHotKeyCaches(Node *node) const {
     return;
   }
 
-  node->hotKeys.clear();
+  if (options.enableHotKeyCache && options.hotKeyCacheCapacity > 0) {
+    node->hotKeys.assign(static_cast<std::size_t>(options.hotKeyCacheCapacity),
+                         HotKey{});
+  } else {
+    node->hotKeys.clear();
+  }
   for (Node *child : node->children) {
     clearHotKeyCaches(child);
   }
 }
 
-bool OptBStarTree::isHotKeyUsable(const Node *node, const HotKey &hotKey,
-                                  int key) const {
-  int entryCount = static_cast<int>(node->entries.size());
-  if (hotKey.index < 0 || hotKey.index > entryCount) {
-    return false;
+std::size_t OptBStarTree::hotKeyCacheSlot(int key) const {
+  std::uint32_t hash = static_cast<std::uint32_t>(key);
+  hash *= 2654435761u;
+
+  std::size_t capacity = static_cast<std::size_t>(options.hotKeyCacheCapacity);
+  if ((capacity & (capacity - 1)) == 0) {
+    return static_cast<std::size_t>(hash) & (capacity - 1);
   }
-  if (hotKey.index < entryCount && node->entries[hotKey.index].key < key) {
-    return false;
-  }
-  if (hotKey.index > 0 && node->entries[hotKey.index - 1].key >= key) {
-    return false;
-  }
-  return true;
+  return static_cast<std::size_t>(hash) % capacity;
 }
 
 bool OptBStarTree::findInHotKeyCache(const Node *node, int key,
@@ -222,21 +220,14 @@ bool OptBStarTree::findInHotKeyCache(const Node *node, int key,
     return false;
   }
 
-  for (int i = 0; i < static_cast<int>(node->hotKeys.size()); ++i) {
-    if (node->hotKeys[i].key != key) {
-      continue;
-    }
+  if (node->hotKeys.empty()) {
+    metrics.hotKeyCacheMisses++;
+    return false;
+  }
 
-    if (!isHotKeyUsable(node, node->hotKeys[i], key)) {
-      node->hotKeys.erase(node->hotKeys.begin() + i);
-      metrics.hotKeyCacheMisses++;
-      return false;
-    }
-
-    index = node->hotKeys[i].index;
-    HotKey hotKey = node->hotKeys[i];
-    node->hotKeys.erase(node->hotKeys.begin() + i);
-    node->hotKeys.insert(node->hotKeys.begin(), hotKey);
+  const HotKey &hotKey = node->hotKeys[hotKeyCacheSlot(key)];
+  if (hotKey.valid && hotKey.key == key) {
+    index = hotKey.index;
     metrics.hotKeyCacheHits++;
     return true;
   }
@@ -250,17 +241,12 @@ void OptBStarTree::rememberHotKey(const Node *node, int key, int index) const {
     return;
   }
 
-  for (int i = 0; i < static_cast<int>(node->hotKeys.size()); ++i) {
-    if (node->hotKeys[i].key == key) {
-      node->hotKeys.erase(node->hotKeys.begin() + i);
-      break;
-    }
+  std::size_t capacity = static_cast<std::size_t>(options.hotKeyCacheCapacity);
+  if (node->hotKeys.size() != capacity) {
+    node->hotKeys.assign(capacity, HotKey{});
   }
 
-  node->hotKeys.insert(node->hotKeys.begin(), {key, index});
-  if (static_cast<int>(node->hotKeys.size()) > options.hotKeyCacheCapacity) {
-    node->hotKeys.pop_back();
-  }
+  node->hotKeys[hotKeyCacheSlot(key)] = {key, index, true};
 }
 
 int OptBStarTree::findIndex(const Node *node, int key) const {
@@ -388,8 +374,8 @@ void OptBStarTree::put_values(Node *node, int endKey,
   }
 }
 
-OptBStarTree::Entry OptBStarTree::splitNodeDirect(Node *node,
-                                                  Node *&rightNode) {
+OptBStarTree::Entry OptBStarTree::splitRootNode(Node *node,
+                                                Node *&rightNode) {
   int entryCount = static_cast<int>(node->entries.size());
   int mid = entryCount / 2;
 
@@ -410,7 +396,6 @@ OptBStarTree::Entry OptBStarTree::splitNodeDirect(Node *node,
   node->hotKeys.clear();
   rightNode->hotKeys.clear();
   splitCount++;
-  metrics.directSplitCount++;
   return upEntry;
 }
 
@@ -493,10 +478,35 @@ OptBStarTree::chooseRedistributionCandidate(Node *parent,
   return {};
 }
 
+bool OptBStarTree::canSplitTwoToThree(Node *parent, int leftIndex) const {
+  if (leftIndex < 0 ||
+      leftIndex + 1 >= static_cast<int>(parent->children.size())) {
+    return false;
+  }
+
+  Node *left = parent->children[leftIndex];
+  Node *right = parent->children[leftIndex + 1];
+  int childEntryCount = static_cast<int>(left->entries.size()) +
+                        static_cast<int>(right->entries.size()) - 1;
+
+  return childEntryCount >= 3 * minEntries() &&
+         childEntryCount <= 3 * maxEntries();
+}
+
+int OptBStarTree::chooseTwoToThreeSplitLeftIndex(Node *parent,
+                                                 int childIndex) const {
+  if (canSplitTwoToThree(parent, childIndex)) {
+    return childIndex;
+  }
+  if (canSplitTwoToThree(parent, childIndex - 1)) {
+    return childIndex - 1;
+  }
+  return -1;
+}
+
 bool OptBStarTree::shouldRedistribute(
     const RedistributionCandidate &candidate) const {
-  if (!candidate.exists ||
-      options.overflowPolicy == OverflowPolicy::DirectSplit) {
+  if (!candidate.exists) {
     return false;
   }
 
@@ -509,13 +519,8 @@ bool OptBStarTree::shouldRedistribute(
   return static_cast<double>(candidate.estimatedMovedEntries) <= threshold;
 }
 
-bool OptBStarTree::redistributeOverflow(Node *parent, int childIndex) {
-  RedistributionCandidate candidate =
-      chooseRedistributionCandidate(parent, childIndex);
-  if (!shouldRedistribute(candidate)) {
-    return false;
-  }
-
+void OptBStarTree::redistributeOverflow(
+    Node *parent, const RedistributionCandidate &candidate) {
   Node *left = parent->children[candidate.leftIndex];
   Node *right = parent->children[candidate.leftIndex + 1];
 
@@ -545,22 +550,11 @@ bool OptBStarTree::redistributeOverflow(Node *parent, int childIndex) {
   right->hotKeys.clear();
   metrics.redistributionCount++;
   metrics.redistributionMovedEntries += candidate.estimatedMovedEntries;
-  return true;
-}
-
-void OptBStarTree::insertDirectSplitIntoParent(Node *parent, int childIndex) {
-  Node *rightNode = nullptr;
-  Entry upEntry = splitNodeDirect(parent->children[childIndex], rightNode);
-
-  parent->entries.insert(parent->entries.begin() + childIndex, upEntry);
-  parent->children.insert(parent->children.begin() + childIndex + 1,
-                          rightNode);
-  parent->hotKeys.clear();
 }
 
 void OptBStarTree::splitRoot(Node *node) {
   Node *rightNode = nullptr;
-  Entry upEntry = splitNodeDirect(node, rightNode);
+  Entry upEntry = splitRootNode(node, rightNode);
 
   root = new Node(false);
   numNode++;
@@ -580,37 +574,38 @@ void OptBStarTree::handleOverflow(
     auto [parent, childIndex] = path.back();
     path.pop_back();
 
-    if (options.overflowPolicy != OverflowPolicy::DirectSplit) {
-      RedistributionCandidate candidate =
-          chooseRedistributionCandidate(parent, childIndex);
+    RedistributionCandidate candidate =
+        chooseRedistributionCandidate(parent, childIndex);
 
-      if (shouldRedistribute(candidate)) {
-        redistributeOverflow(parent, childIndex);
-        return;
-      }
+    if (options.overflowPolicy == OverflowPolicy::EagerRedistribution &&
+        candidate.exists) {
+      redistributeOverflow(parent, candidate);
+      return;
+    }
 
+    if (options.overflowPolicy == OverflowPolicy::SelectiveRedistribution &&
+        candidate.exists && shouldRedistribute(candidate)) {
+      redistributeOverflow(parent, candidate);
+      return;
+    }
+
+    int leftIndex = chooseTwoToThreeSplitLeftIndex(parent, childIndex);
+    if (leftIndex != -1) {
       if (candidate.exists) {
         metrics.skippedRedistributionCount++;
       }
-
-      if (options.overflowPolicy == OverflowPolicy::SelectiveRedistribution &&
-          options.selectiveFallbackToDirectSplit) {
-        insertDirectSplitIntoParent(parent, childIndex);
-        node = parent;
-        continue;
-      }
-
-      int leftIndex =
-          (childIndex < static_cast<int>(parent->children.size()) - 1)
-              ? childIndex
-              : childIndex - 1;
       splitNodeTwoToThree(parent, leftIndex);
       node = parent;
       continue;
     }
 
-    insertDirectSplitIntoParent(parent, childIndex);
-    node = parent;
+    if (candidate.exists) {
+      metrics.forcedRedistributionCount++;
+      redistributeOverflow(parent, candidate);
+      return;
+    }
+
+    throw std::logic_error("B*-tree overflow cannot be handled safely.");
   }
 }
 
