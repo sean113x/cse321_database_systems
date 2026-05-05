@@ -3,6 +3,8 @@
 #include "experiment/experiment2.h"
 #include "experiment/experiment3.h"
 #include "experiment/experiment4.h"
+#include "experiment/experiment5.h"
+#include "experiment/experiment6.h"
 #include "index_tree/bplustree.h"
 #include "index_tree/bstartree.h"
 #include "index_tree/btree.h"
@@ -143,6 +145,8 @@ int runExperimentMode() {
   std::cout << "  2. Point Search Performance\n";
   std::cout << "  3. Range Query Performance\n";
   std::cout << "  4. Deletion Performance\n";
+  std::cout << "  5. Intra-node Search Optimization\n";
+  std::cout << "  6. Selective Redistribution in B*-tree\n";
 
   std::string experiment = prompt("Select experiment", "1");
 
@@ -157,6 +161,12 @@ int runExperimentMode() {
   }
   if (experiment == "4") {
     return runExperiment4();
+  }
+  if (experiment == "5") {
+    return runExperiment5();
+  }
+  if (experiment == "6") {
+    return runExperiment6();
   }
 
   std::cout << "Unknown experiment: " << experiment << '\n';
