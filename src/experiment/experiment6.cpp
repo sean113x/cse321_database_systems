@@ -229,10 +229,8 @@ int runExperiment6() {
   }
 
   createResultsDirectory();
-  std::ofstream runFile(
-      "results_experiment/experiment6_selective_redistribution_runs.csv");
-  std::ofstream summaryFile(
-      "results_experiment/experiment6_selective_redistribution_summary.csv");
+  std::ofstream runFile("results_experiment/experiment6_runs.csv");
+  std::ofstream summaryFile("results_experiment/experiment6_summary.csv");
   runFile << std::setprecision(12);
   summaryFile << std::setprecision(12);
 
@@ -317,10 +315,7 @@ int runExperiment6() {
     std::cout << '\n';
   }
 
-  std::cout
-      << "Saved results_experiment/experiment6_selective_redistribution_runs.csv\n";
-  std::cout << "Saved "
-               "results_experiment/experiment6_selective_redistribution_"
-               "summary.csv\n";
+  std::cout << "Saved results_experiment/experiment6_runs.csv\n";
+  std::cout << "Saved results_experiment/experiment6_summary.csv\n";
   return 0;
 }

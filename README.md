@@ -97,13 +97,17 @@ Then choose one of the built-in experiments:
 2. Point Search Performance
 3. Range Query Performance
 4. Deletion Performance
+5. Intra-node Search Optimization
+6. Selective Redistribution in B*-tree
 ```
 
-Each experiment evaluates B-Tree, B\*-Tree, and B+tree over the following tree orders:
+Experiments 1 through 4 evaluate B-Tree, B\*-Tree, and B+tree over the following tree orders:
 
 ```text
 3, 5, 10, 16, 32, 64, 128, 256, 512, 1024
 ```
+
+Experiments 5 and 6 use specialized optimized B\*-Tree variants and order sets described below.
 
 ## Inputs
 
@@ -125,14 +129,8 @@ Interactive mode prints matching records directly to the terminal.
 
 Experiment mode writes result files to `results_experiment/`:
 
-- `experiment1_runs.csv`
-- `experiment1_summary.csv`
-- `experiment2_runs.csv`
-- `experiment2_summary.csv`
-- `experiment3_runs.csv`
-- `experiment3_summary.csv`
-- `experiment4_runs.csv`
-- `experiment4_summary.csv`
+- `experiment<n>_runs.csv`
+- `experiment<n>_summary.csv`
 
 The result files include execution time, node-read counts, simulated SSD cost, total time including simulated SSD cost, tree height, node count, entry count, and node utilization where applicable.
 
@@ -185,6 +183,52 @@ Workloads:
 # Select experiment: 4
 ```
 
+#### Experiment 5: Intra-node Search Optimization
+
+Benchmarks the optimized B\*-Tree implementation with different node-internal search strategies:
+
+- Linear search
+- Binary search
+- Binary search with a 64-entry hot-key cache
+
+The experiment builds each tree from the full dataset and executes 100,000 point-search queries per measured run. It compares the strategies over three query distributions:
+
+- Uniform random lookups
+- Hotspot workload, where 80% of queries target 1% of keys
+- Zipfian workload with theta `0.99`
+
+Tested tree orders:
+
+```text
+16, 32, 64, 128, 256, 512, 1024
+```
+
+```bash
+./project1 experiment
+# Select experiment: 5
+```
+
+#### Experiment 6: Selective Redistribution in B\*-tree
+
+Compares insertion behavior for a baseline B-Tree and two optimized B\*-Tree redistribution policies:
+
+- `btree`
+- `bstar_eager`
+- `bstar_selective_alpha_0_25`
+
+The selective redistribution policy skips some sibling redistributions when the expected benefit is below alpha `0.25`, then measures the tradeoff between insertion time, split count, redistribution count, moved entries, tree height, node count, and node utilization.
+
+Tested tree orders:
+
+```text
+10, 20, 50, 100
+```
+
+```bash
+./project1 experiment
+# Select experiment: 6
+```
+
 ## Common Parameters and Metrics
 
 - `order`: maximum child capacity parameter used by the tree
@@ -195,6 +239,14 @@ Workloads:
 - `total_time_with_ssd_ms`: measured execution time plus simulated SSD cost
 - `node_utilization`: percentage of occupied entries relative to node capacity
 - `rsd`: relative standard deviation used to stop repeated benchmark runs once measurements stabilize
+- `intra_node_search_count`: number of searches performed inside tree nodes
+- `intra_node_key_comparisons`: key comparisons made during node-internal search
+- `hot_key_cache_hits` / `hot_key_cache_misses`: cache behavior for repeated point-search keys in Experiment 5
+- `redistribution_count`: number of B\*-Tree sibling redistributions during insertion
+- `forced_redistribution_count`: redistributions required before splitting can proceed
+- `skipped_redistribution_count`: redistribution attempts skipped by the selective policy in Experiment 6
+- `two_to_three_split_count`: number of B\*-Tree 2-to-3 split operations
+- `redistribution_moved_entries`: entries moved across siblings during redistribution
 
 ## Project Structure
 
